@@ -27,9 +27,10 @@ class TestRSA(unittest.TestCase):
 
     def test_generate_double_digit_prime(self):
         for _ in range(100):
-            n = generate_double_digit_prime()
+            n_digits = random.randint(1, 10)
+            n = generate_n_digit_prime(n_digits)
             self.assertTrue(is_prime(n))
-            self.assertEqual(2, len(str(n)))
+            self.assertEqual(n_digits, len(str(n)))
 
     def test_gcd(self):
         test_cases = {

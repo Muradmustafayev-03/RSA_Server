@@ -19,16 +19,24 @@ def is_prime(n: int) -> bool:
     return True
 
 
-def generate_double_digit_prime() -> int:
+def generate_n_digit_prime(n_digits: int = 2) -> int:
     """
-    Generate a random double-digit prime number.
+    Generate a random n-digit prime number.
+
+    :param n_digits: The number of digits the prime number should have. Must be positive.
+    :type n_digits: int
 
     :return: A random double-digit prime number.
     :rtype: int
+
+    :raises AssertionError: If n_digits is not positive.
     """
-    prime = random.randint(10, 99)
+    assert n_digits > 0, f'{n_digits} is not positive.'
+
+    n_digit_number = lambda n: random.randint(10 ** (n - 1), 10 ** n - 1)
+    prime = n_digit_number(n_digits)
     while not is_prime(prime):
-        prime = random.randint(10, 99)
+        prime = n_digit_number(n_digits)
     return prime
 
 
@@ -87,8 +95,8 @@ def generate_keypair() -> ((int, int), (int, int)):
     :return: A tuple containing the public and private keys in the form (n, e) and (n, d) respectively.
     :rtype: tuple[tuple[int, int], tuple[int, int]]
     """
-    p = generate_double_digit_prime()
-    q = generate_double_digit_prime()
+    p = generate_n_digit_prime()
+    q = generate_n_digit_prime()
 
     n = p * q
     phi = (p - 1) * (q - 1)
