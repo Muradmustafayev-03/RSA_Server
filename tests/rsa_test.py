@@ -79,4 +79,8 @@ class TestRSA(unittest.TestCase):
                 decrypted_message = decrypt(encrypted_message, private_key)
 
                 # Step 4: Check that the decrypted message is the same as the original message
-                self.assertEqual(message, decrypted_message)
+                self.assertEqual(message, decrypted_message,
+                                 f'Original message: {message}\n'
+                                 f'Decrypted message: {decrypted_message}\n'
+                                 f'Public key: {public_key}\n'
+                                 f'Private key: {private_key}\n')
