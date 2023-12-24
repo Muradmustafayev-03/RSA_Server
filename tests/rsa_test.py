@@ -68,11 +68,11 @@ class TestRSA(unittest.TestCase):
     def test_encrypt_decrypt(self):
         for _ in range(10):
             # Step 1: Generate keypair
-            public_key, private_key = generate_keypair()
+            public_key, private_key = generate_keypair(d=2)
 
             for _ in range(10):
                 # Step 2: Encrypt message
-                message = generate_random_message()
+                message = generate_random_message(length=random.randint(10, 100))
                 encrypted_message = encrypt(message, public_key)
 
                 # Step 3: Decrypt message

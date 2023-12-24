@@ -88,15 +88,18 @@ def mod_inverse(a: int, m: int) -> int:
     return x1 + m0 if x1 < 0 else x1
 
 
-def generate_keypair() -> ((int, int), (int, int)):
+def generate_keypair(d: int = 2) -> ((int, int), (int, int)):
     """
     Generate public and private keys.
+
+    :param d: The number of digits the prime numbers should have. Must be positive. Optional, defaults to 2.
+    :type d: int
 
     :return: A tuple containing the public and private keys in the form (n, e) and (n, d) respectively.
     :rtype: tuple[tuple[int, int], tuple[int, int]]
     """
-    p = generate_n_digit_prime()
-    q = generate_n_digit_prime()
+    p = generate_n_digit_prime(d)
+    q = generate_n_digit_prime(d)
 
     n = p * q
     phi = (p - 1) * (q - 1)
