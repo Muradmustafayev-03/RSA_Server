@@ -1,7 +1,7 @@
 import string
 import unittest
 
-from rsa import *
+from src.rsa import *
 
 
 def generate_random_message(length: int = 100) -> str:
