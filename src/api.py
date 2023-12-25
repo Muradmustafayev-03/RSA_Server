@@ -47,8 +47,7 @@ def register(user_info: UserAuth):
     public_key, private_key = generate_keypair()
 
     # Store the user's public key and hashed password
-    users_db[username] = {"public_key": public_key, "password": password}
-    print(users_db)
+    users_db[username] = {"password": password, "public_key": public_key, "private_key": private_key}
 
     return {"message": "User registered successfully"}
 
@@ -66,50 +65,10 @@ def login(user_info: UserAuth):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return {"access_token": username, "token_type": "bearer"}
+    # Hash the username with the user's public key
+    access_token = ''.join(encrypt(username, user["public_key"]))
 
-
-@app.post("/generate_session_key/{recipient}")
-def generate_session_key(
-        recipient: str,
-        current_user: dict = Depends(get_current_user)
-):
-    # Ensure recipient exists
-    if recipient not in users_db:
-        raise HTTPException(status_code=404, detail="Recipient not found")
-
-    # Retrieve the public key of the recipient
-    recipient_public_key = users_db[recipient]["public_key"]
-
-    # Generate a session key
-    session_key = generate_session_key()
-
-    # Encrypt the session key with the recipient's public key
-    encrypted_session_key = encrypt(str(session_key), recipient_public_key)
-
-    return {"encrypted_session_key": encrypted_session_key}
-
-
-@app.post("/exchange_session_key/{recipient}")
-def exchange_session_key(
-        recipient: str,
-        encrypted_session_key: list[int],
-        current_user: dict = Depends(get_current_user)
-):
-    # Ensure recipient exists
-    if recipient not in users_db:
-        raise HTTPException(status_code=404, detail="Recipient not found")
-
-    # Retrieve the private key of the current user
-    current_user_private_key = current_user["private_key"]
-
-    # Decrypt the received encrypted session key
-    decrypted_session_key = decrypt(encrypted_session_key, current_user_private_key)
-
-    # Store the session key for future communication
-    users_db[recipient]["session_key"] = decrypted_session_key
-
-    return {"message": "Session key exchanged successfully"}
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 def start_server():

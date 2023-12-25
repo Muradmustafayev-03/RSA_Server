@@ -69,5 +69,27 @@ class TestLogin(unittest.TestCase):
         self.assertEqual({'detail': 'Invalid credentials'}, response.json())
 
 
+class TestExchangeSessionKey(unittest.TestCase):
+    user1 = 'user5'
+    password1 = 'password5'
+
+    user2 = 'user6'
+    password2 = 'password6'
+
+    token1: str
+    token2: str
+
+    def setUp(self):
+        # Register two users
+        requests.post(f'{PROTOCOL}://{HOST}:{PORT}/register', json={'username': self.user1, 'password': self.password1})
+        requests.post(f'{PROTOCOL}://{HOST}:{PORT}/register', json={'username': self.user2, 'password': self.password2})
+
+        # Login both users
+        self.token1 = requests.post(f'{PROTOCOL}://{HOST}:{PORT}/token',
+                                    json={'username': self.user1, 'password': self.password1}).json()['access_token']
+        self.token2 = requests.post(f'{PROTOCOL}://{HOST}:{PORT}/token',
+                                    json={'username': self.user2, 'password': self.password2}).json()['access_token']
+
+
 if __name__ == '__main__':
     unittest.main()
