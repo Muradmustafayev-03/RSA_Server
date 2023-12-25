@@ -118,7 +118,7 @@ def generate_keypair(d: int = 2) -> ((int, int), (int, int)):
     return public_key, private_key
 
 
-def encrypt(message: str, public_key: (int, int)) -> list:
+def encrypt(message: str, public_key: (int, int)) -> str:
     """
     Encrypt a message using RSA.
 
@@ -128,19 +128,19 @@ def encrypt(message: str, public_key: (int, int)) -> list:
     :type public_key: tuple[int, int]
 
     :return: The encrypted message.
-    :rtype: list[int]
+    :rtype: str
     """
     n, e = public_key
-    cipher_text = [(ord(char) ** e) % n for char in message]
+    cipher_text = ','.join([str((ord(char) ** e) % n) for char in message])
     return cipher_text
 
 
-def decrypt(cipher_text: list, private_key: (int, int)) -> str:
+def decrypt(cipher_text: str, private_key: (int, int)) -> str:
     """
     Decrypt a message using RSA.
 
     :param cipher_text: The message to decrypt.
-    :type cipher_text: list[int]
+    :type cipher_text: str
     :param private_key: The private key to decrypt the message with.
     :type private_key: tuple[int, int]
 
@@ -148,5 +148,6 @@ def decrypt(cipher_text: list, private_key: (int, int)) -> str:
     :rtype: str
     """
     n, d = private_key
+    cipher_text = [int(char) for char in cipher_text.split(',')]
     decrypted_message = ''.join([chr((char ** d) % n) for char in cipher_text])
     return decrypted_message

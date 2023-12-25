@@ -84,3 +84,7 @@ class TestRSA(unittest.TestCase):
                                  f'Decrypted message: {decrypted_message}\n'
                                  f'Public key: {public_key}\n'
                                  f'Private key: {private_key}\n')
+
+
+if __name__ == '__main__':
+    unittest.main()
