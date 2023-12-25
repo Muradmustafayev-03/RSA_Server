@@ -1,6 +1,14 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
-from rsa import generate_keypair, encrypt, decrypt
+from pydantic import BaseModel
+import uvicorn
+
+from src.rsa import generate_keypair, encrypt, decrypt
+
+
+PROTOCOL = 'http'
+HOST = '127.0.0.1'
+PORT = 8000
 
 app = FastAPI()
 
@@ -9,6 +17,11 @@ users_db = {}
 
 # OAuth2PasswordBearer for authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+class UserAuth(BaseModel):
+    username: str
+    password: str
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -22,8 +35,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
-@app.post("/register/{username}")
-def register_user(username: str, password: str):
+@app.post("/register")
+def register(user_info: UserAuth):
+    username = user_info.username
+    password = user_info.password
+
     if username in users_db:
         raise HTTPException(status_code=400, detail="Username already registered")
 
@@ -32,8 +48,25 @@ def register_user(username: str, password: str):
 
     # Store the user's public key and hashed password
     users_db[username] = {"public_key": public_key, "password": password}
+    print(users_db)
 
     return {"message": "User registered successfully"}
+
+
+@app.post("/token")
+def login(user_info: UserAuth):
+    username = user_info.username
+    password = user_info.password
+
+    user = users_db.get(username)
+    if user is None or user["password"] != password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return {"access_token": username, "token_type": "bearer"}
 
 
 @app.post("/generate_session_key/{recipient}")
@@ -77,3 +110,11 @@ def exchange_session_key(
     users_db[recipient]["session_key"] = decrypted_session_key
 
     return {"message": "Session key exchanged successfully"}
+
+
+def start_server():
+    uvicorn.run("src.api:app", host=HOST, port=PORT)
+
+
+if __name__ == "__main__":
+    start_server()
