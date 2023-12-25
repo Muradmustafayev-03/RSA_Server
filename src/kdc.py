@@ -1,4 +1,4 @@
-from rsa import generate_keypair, encrypt, decrypt
+from src.rsa import generate_keypair, encrypt, decrypt
 
 
 class KeyDistributionCenter:
