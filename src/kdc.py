@@ -35,6 +35,10 @@ class KeyDistributionCenter:
         return None, None
 
     def register_user(self, username, password):
+        # Verify that the user does not already exist
+        if username in self.__users:
+            return False
+
         # Hash the password
         password_hash = self.__hash_password(password)
 
@@ -43,6 +47,8 @@ class KeyDistributionCenter:
 
         # Store the user's public key, private key, and password hash
         self.__users[username] = {"public_key": public_key, "private_key": private_key, "password_hash": password_hash}
+
+        return True
 
     def verify_user(self, username, password):
         # Verify that the user exists and the password is correct
