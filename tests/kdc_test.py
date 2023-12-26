@@ -3,23 +3,30 @@ import unittest
 from src.kdc import KeyDistributionCenter
 
 
-# class TestKDC(unittest.TestCase):
-    # def setUp(self):
-    #     self.kdc = KeyDistributionCenter()
-    #     self.kdc.register_user("alice", "alice")
-    #     self.kdc.register_user("bob", "bob")
-    #
-    # def test_register_user(self):
-    #     self.kdc.register_user("charlie", "charlie")
-    #     self.assertTrue("charlie" in self.kdc)
-    #     self.assertTrue("public_key" in self.kdc._KeyDistributionCenter__users["charlie"])
-    #     self.assertTrue("private_key" in self.kdc._KeyDistributionCenter__users["charlie"])
-    #     self.assertTrue("password_hash" in self.kdc._KeyDistributionCenter__users["charlie"])
-    #
-    # def test_generate_session_key(self):
-    #     encrypted_session_key = self.kdc.generate_session_key("alice", "bob")
-    #     self.assertIsNotNone(encrypted_session_key)
-    #
-    # def test_exchange_session_key(self):
-    #     encrypted_session_key = self.kdc.exchange_session_key("alice", "bob")
-    #     self.assertIsNotNone(encrypted_session_key)
+class TestKDC(unittest.TestCase):
+    user1 = 'Alice', '123456'
+    user2 = 'Bob', 'password'
+
+    def setUp(self):
+        self.kdc = KeyDistributionCenter()
+        self.kdc.register_user(*self.user1)
+        self.kdc.register_user(*self.user2)
+
+    def test_register_user(self):
+        self.assertTrue(self.kdc.verify_user(*self.user1))
+        self.assertTrue(self.kdc.verify_user(*self.user2))
+
+    def test_generate_session_key(self):
+        session_key = self.kdc.generate_session_key(*self.user1, self.user2[0])
+        self.assertEqual(len(session_key.split(',')), 20)
+
+    def test_exchange_session_key(self):
+        session_key = self.kdc.exchange_session_key(*self.user1, self.user2[0])
+        self.assertEqual(len(session_key), 20)
+
+        session_key = self.kdc.exchange_session_key(*self.user2, self.user1[0])
+        self.assertEqual(len(session_key), 20)
+
+
+if __name__ == '__main__':
+    unittest.main()
