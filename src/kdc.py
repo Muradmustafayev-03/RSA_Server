@@ -1,15 +1,45 @@
 import bcrypt
-import string
-import random
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from src.rsa import generate_keypair, encrypt, decrypt
 
 
-class KeyDistributionCenter:
-    def __init__(self):
-        self.__users = {
-            # username: {"public_key": public_key, "private_key": private_key, "password_hash": password_hash}
-        }
+class Session:
+    def __init__(self, sender_username: str, receiver_username: str, session_key: bytes):
+        self.sender_username = sender_username
+        self.receiver_username = receiver_username
+        self.__session_key = session_key
+        self.__is_active = True
+
+    @property
+    def is_active(self):
+        return self.__is_active
+
+    def close(self):
+        self.__is_active = False
+
+    def encrypt_message(self, message):
+        cipher = Cipher(algorithms.AES(self.__session_key), modes.CFB8(), backend=default_backend())
+        encryptor = cipher.encryptor()
+        ciphertext = encryptor.update(message.encode()) + encryptor.finalize()
+        return ciphertext
+
+    def decrypt_message(self, ciphertext):
+        cipher = Cipher(algorithms.AES(self.__session_key), modes.CFB8(), backend=default_backend())
+        decryptor = cipher.decryptor()
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        return plaintext.decode()
+
+
+class User:
+    def __init__(self, username: str, password: str):
+        self.__username = username
+        self.__password_hash = self.__hash_password(password)
+        self.__public_key, self.__private_key = generate_keypair(d=2)
+        self.__sessions = []
 
     @staticmethod
     def __hash_password(password):
@@ -19,65 +49,51 @@ class KeyDistributionCenter:
         return hashed_password
 
     @staticmethod
-    def __verify_password(input_password, stored_hash):
+    def verify_password(input_password, stored_hash):
         # Check if the input password matches the stored hash
         return bcrypt.checkpw(input_password.encode('utf-8'), stored_hash)
 
     @staticmethod
-    def __generate_session_key(length: int = 20):
-        # Generate a random session key of the specified length
-        return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
+    def generate_session_key(username, salt):
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            iterations=100000,
+            salt=salt,
+            length=32,
+            backend=default_backend()
+        )
+        key = kdf.derive(username)
+        return key
 
-    def __get_user_keys(self, username):
-        # Retrieve and return the public key of the specified user
-        if username in self.__users:
-            return self.__users[username]["public_key"], self.__users[username]["private_key"]
-        return None, None
+    def establish_session_as_sender(self, receiver_username, receiver_public_key):
+        session_key = self.generate_session_key(receiver_username, self.__password_hash)
+        session = Session(self.__username, receiver_username, session_key)
+        self.__sessions.append(session)
 
-    def register_user(self, username, password):
-        # Verify that the user does not already exist
-        if username in self.__users:
-            return False
+        encoded_session_key = encrypt(session_key.decode(), receiver_public_key)
+        return encoded_session_key
 
-        # Hash the password
-        password_hash = self.__hash_password(password)
+    def establish_session_as_receiver(self, sender_username, encoded_session_key):
+        session_key = decrypt(encoded_session_key, self.__private_key)
+        session = Session(sender_username, self.__username, session_key.encode())
+        self.__sessions.append(session)
 
-        # Generate and store RSA key pair for the user
-        public_key, private_key = generate_keypair()
+    def send_message(self, receiver_username, message):
+        for session in self.__sessions:
+            if session.receiver_username == receiver_username:
+                return session.encrypt_message(message)
+        return None
 
-        # Store the user's public key, private key, and password hash
-        self.__users[username] = {"public_key": public_key, "private_key": private_key, "password_hash": password_hash}
+    def receive_message(self, sender_username, ciphertext):
+        for session in self.__sessions:
+            if session.sender_username == sender_username:
+                return session.decrypt_message(ciphertext)
+        return None
 
-        return True
+    def update_keys(self):
+        for session in self.__sessions:
+            session.close()
+        self.__public_key, self.__private_key = generate_keypair(d=2)
 
-    def verify_user(self, username, password):
-        # Verify that the user exists and the password is correct
-        return username in self.__users and self.__verify_password(password, self.__users[username]["password_hash"])
-
-    def generate_session_key(self, sender_username, sender_password, receiver_username):
-        # Verify that the sender exists and the password is correct
-        assert self.verify_user(sender_username, sender_password), "Invalid sender username or password"
-
-        # Generate a session key for secure communication between sender and receiver
-        receiver_public_key, _ = self.__get_user_keys(receiver_username)
-
-        # Generate a random session key
-        session_key = self.__generate_session_key()
-
-        # Encrypt the session key with the receiver's public key
-        encrypted_session_key = encrypt(session_key, receiver_public_key)
-
-        return encrypted_session_key
-
-    def exchange_session_key(self, sender_username, sender_password, receiver_username):
-        # Verify that the sender exists and the password is correct
-        assert self.verify_user(sender_username, sender_password), "Invalid sender username or password"
-
-        # Simulate the exchange of session keys between sender and receiver
-        encrypted_session_key = self.generate_session_key(sender_username, sender_password, receiver_username)
-
-        # Decrypt the session key with the receiver's private key
-        _, receiver_private_key = self.__get_user_keys(receiver_username)
-        decrypted_session_key = decrypt(encrypted_session_key, receiver_private_key)
-
-        return decrypted_session_key
+    def clear_inactive_sessions(self):
+        self.__sessions = [session for session in self.__sessions if session.is_active]
