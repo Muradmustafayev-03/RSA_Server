@@ -1,20 +1,7 @@
-import string
 import unittest
 
 from src.rsa import *
-
-
-def generate_random_message(length: int = 100) -> str:
-    """
-    Generate a random message of the specified length.
-
-    :param length: The length of the message to generate.
-    :type length: int
-
-    :return: A random message of the specified length.
-    :rtype: str
-    """
-    return ''.join(random.choice(string.ascii_letters + ' ') for _ in range(length))
+from tests.utils import generate_random_message
 
 
 class TestRSA(unittest.TestCase):

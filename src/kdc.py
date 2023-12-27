@@ -22,13 +22,17 @@ class Session:
         self.__is_active = False
 
     def encrypt_message(self, message):
-        cipher = Cipher(algorithms.AES(self.__session_key), modes.CFB8(), backend=default_backend())
+        cipher = Cipher(
+            algorithms.AES(self.__session_key[:32]), modes.CFB8(self.__session_key[:16]), backend=default_backend()
+        )
         encryptor = cipher.encryptor()
         ciphertext = encryptor.update(message.encode()) + encryptor.finalize()
         return ciphertext
 
     def decrypt_message(self, ciphertext):
-        cipher = Cipher(algorithms.AES(self.__session_key), modes.CFB8(), backend=default_backend())
+        cipher = Cipher(
+            algorithms.AES(self.__session_key[:32]), modes.CFB8(self.__session_key[:16]), backend=default_backend()
+        )
         decryptor = cipher.decryptor()
         plaintext = decryptor.update(ciphertext) + decryptor.finalize()
         return plaintext.decode()
@@ -48,13 +52,11 @@ class User:
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
         return hashed_password
 
-    @staticmethod
-    def verify_password(input_password, stored_hash):
+    def verify_password(self, password):
         # Check if the input password matches the stored hash
-        return bcrypt.checkpw(input_password.encode('utf-8'), stored_hash)
+        return bcrypt.checkpw(password.encode('utf-8'), self.__password_hash)
 
-    @staticmethod
-    def generate_session_key(username, salt):
+    def generate_session_key(self, receiver_username, salt):
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             iterations=100000,
@@ -62,15 +64,15 @@ class User:
             length=32,
             backend=default_backend()
         )
-        key = kdf.derive(username)
-        return key
+        key = kdf.derive((self.__username + receiver_username).encode())
+        return key.hex()
 
     def establish_session_as_sender(self, receiver_username, receiver_public_key):
         session_key = self.generate_session_key(receiver_username, self.__password_hash)
-        session = Session(self.__username, receiver_username, session_key)
+        session = Session(self.__username, receiver_username, session_key.encode())
         self.__sessions.append(session)
 
-        encoded_session_key = encrypt(session_key.decode(), receiver_public_key)
+        encoded_session_key = encrypt(session_key, receiver_public_key)
         return encoded_session_key
 
     def establish_session_as_receiver(self, sender_username, encoded_session_key):
