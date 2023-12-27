@@ -40,8 +40,8 @@ class Session:
 
 class User:
     def __init__(self, username: str, password: str):
-        self.__username = username
-        self.__password_hash = self.__hash_password(password)
+        self.username = username
+        self.password_hash = self.__hash_password(password)
         self.__public_key, self.__private_key = generate_keypair(d=2)
         self.__sessions = []
 
@@ -54,7 +54,7 @@ class User:
 
     def verify_password(self, password):
         # Check if the input password matches the stored hash
-        return bcrypt.checkpw(password.encode('utf-8'), self.__password_hash)
+        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash)
 
     def generate_session_key(self, receiver_username, salt):
         kdf = PBKDF2HMAC(
@@ -64,12 +64,12 @@ class User:
             length=32,
             backend=default_backend()
         )
-        key = kdf.derive((self.__username + receiver_username).encode())
+        key = kdf.derive((self.username + receiver_username).encode())
         return key.hex()
 
     def establish_session_as_sender(self, receiver_username, receiver_public_key):
-        session_key = self.generate_session_key(receiver_username, self.__password_hash)
-        session = Session(self.__username, receiver_username, session_key.encode())
+        session_key = self.generate_session_key(receiver_username, self.password_hash)
+        session = Session(self.username, receiver_username, session_key.encode())
         self.__sessions.append(session)
 
         encoded_session_key = encrypt(session_key, receiver_public_key)
@@ -77,8 +77,9 @@ class User:
 
     def establish_session_as_receiver(self, sender_username, encoded_session_key):
         session_key = decrypt(encoded_session_key, self.__private_key)
-        session = Session(sender_username, self.__username, session_key.encode())
+        session = Session(sender_username, self.username, session_key.encode())
         self.__sessions.append(session)
+        return self.__public_key
 
     def send_message(self, receiver_username, message):
         for session in self.__sessions:

@@ -1,75 +1,75 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, WebSocket, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel
-from src.kdc import KeyDistributionCenter
+from starlette.websockets import WebSocketDisconnect
+
+from src.kdc import User
 
 app = FastAPI()
-key_distribution_center = KeyDistributionCenter()
 
-# OAuth2PasswordBearer is used for token-based authentication
+# This is a simplistic representation. In a real-world scenario, you would use a database for user management.
+users_db = {}
+
+# OAuth2 for token-based authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-# Pydantic models for request and response
-class UserRegistration(BaseModel):
-    username: str
-    password: str
+# WebSocket connections storage
+websocket_connections = {}
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-
-class SessionKeyExchange(BaseModel):
-    receiver_username: str
-
-
-# Dependency to get the current user based on the token
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    # You would need to implement a function to verify the token and retrieve the user from it
-    # In this example, we assume a simple token validation
-    if token != "fake-access-token":
-        raise credentials_exception
-    return token
-
-
-# User registration endpoint
-@app.post("/register")
-def register_user(user: UserRegistration):
-    success = key_distribution_center.register_user(user.username, user.password)
-    if success:
-        return {"message": "User registered successfully"}
-    else:
-        raise HTTPException(status_code=400, detail="User already exists")
-
-
-# Token-based authentication endpoint
-@app.post("/token")
-def login_for_access_token(user: UserRegistration):
-    user_verified = key_distribution_center.verify_user(user.username, user.password)
-    if not user_verified:
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    user = users_db.get(token)
+    if user is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # In a real-world scenario, you would generate a secure access token here
-    access_token = "fake-access-token"
-    token_type = "bearer"
-    return {"access_token": access_token, "token_type": token_type}
+    return user
 
 
-# Session key exchange endpoint
-@app.post("/session-key-exchange")
-def session_key_exchange(session_key_data: SessionKeyExchange, current_user: str = Depends(get_current_user)):
-    sender_username = current_user
-    sender_password = "password"  # You would need to get the password securely, maybe from a token
+@app.post("/register/{username}")
+async def register_user(username: str, password: str):
+    # Create a new user and store it in the database
+    user = User(username, password)
+    users_db[username] = user
+    return {"message": "User registered successfully"}
 
-    encrypted_session_key = key_distribution_center.generate_session_key(
-        sender_username, sender_password, session_key_data.receiver_username
-    )
 
-    return {"encrypted_session_key": encrypted_session_key}
+@app.post("/token")
+async def login_for_access_token(username: str, password: str):
+    # Validate credentials and return an access token (you can use OAuth2 for this)
+    user = users_db.get(username)
+    if user and user.verify_password(password):
+        # In a real-world scenario, you would use a more secure method to generate tokens
+        token = username
+        return {"access_token": token, "token_type": "bearer"}
+
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+@app.websocket("/ws/{username}")
+async def websocket_endpoint(username: str, websocket: WebSocket, current_user: User = Depends(get_current_user)):
+    await websocket.accept()
+    websocket_connections[username] = websocket
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Handle data received from the websocket, e.g., establish sessions and exchange messages
+            # Use the methods from your KDC module
+
+            # Example: establish session
+            if data.startswith("SESSION"):
+                _, receiver_username, receiver_public_key = data.split()
+                encoded_session_key = current_user.establish_session_as_sender(receiver_username, receiver_public_key)
+                await websocket.send_text(f"SESSION {receiver_username} {encoded_session_key}")
+
+            # Example: secure message exchange
+            elif data.startswith("MESSAGE"):
+                _, receiver_username, message = data.split()
+                ciphertext = current_user.send_message(receiver_username, message)
+                await websocket.send_text(f"MESSAGE {receiver_username} {ciphertext}")
+
+    except WebSocketDisconnect:
+        del websocket_connections[username]
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host='127.0.0.1', port=8000)
