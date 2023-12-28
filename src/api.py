@@ -51,20 +51,36 @@ async def websocket_endpoint(username: str, websocket: WebSocket, current_user: 
     try:
         while True:
             data = await websocket.receive_text()
-            # Handle data received from the websocket, e.g., establish sessions and exchange messages
-            # Use the methods from your KDC module
 
-            # Example: establish session
-            if data.startswith("SESSION"):
-                _, receiver_username, receiver_public_key = data.split()
-                encoded_session_key = current_user.establish_session_as_sender(receiver_username, receiver_public_key)
-                await websocket.send_text(f"SESSION {receiver_username} {encoded_session_key}")
+            # START_SESSION - Establish a session with sender by sending the public key
+            # SESSION_KEY - Establish the session with receiver by sending the encoded session key
+            # MESSAGE - Send a message to the receiver
 
-            # Example: secure message exchange
-            elif data.startswith("MESSAGE"):
+            if data.startswith("START_SESSION"):
+                _, receiver_username = data.split()
+                receiver = users_db.get(receiver_username)
+                if receiver:
+                    encoded_session_key = current_user.establish_session_as_sender(receiver_username, receiver.public_key)
+                    await websocket.send_text(f"SESSION_KEY {receiver_username} {encoded_session_key}")
+                else:
+                    await websocket.send_text("ERROR User not found")
+
+            if data.startswith("SESSION_KEY"):
+                _, sender_username, encoded_session_key = data.split()
+                sender = users_db.get(sender_username)
+                if sender:
+                    sender.establish_session_as_receiver(current_user.username, encoded_session_key)
+                else:
+                    await websocket.send_text("ERROR User not found")
+
+            if data.startswith("MESSAGE"):
                 _, receiver_username, message = data.split()
-                ciphertext = current_user.send_message(receiver_username, message)
-                await websocket.send_text(f"MESSAGE {receiver_username} {ciphertext}")
+                receiver = users_db.get(receiver_username)
+                if receiver:
+                    ciphertext = current_user.send_message(receiver_username, message)
+                    await websocket.send_text(f"MESSAGE {current_user.username} {ciphertext}")
+                else:
+                    await websocket.send_text("ERROR User not found")
 
     except WebSocketDisconnect:
         del websocket_connections[username]
