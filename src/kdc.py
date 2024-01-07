@@ -9,10 +9,18 @@ from src.rsa import generate_keypair, encrypt, decrypt
 
 class Session:
     def __init__(self, sender_username: str, receiver_username: str, session_key: bytes):
-        self.sender_username = sender_username
-        self.receiver_username = receiver_username
+        self.__sender_username = sender_username
+        self.__receiver_username = receiver_username
         self.__session_key = session_key
         self.__is_active = True
+
+    @property
+    def sender_username(self):
+        return self.__sender_username
+
+    @property
+    def receiver_username(self):
+        return self.__receiver_username
 
     @property
     def is_active(self):
